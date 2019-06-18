@@ -15,7 +15,7 @@
 #endif
 #define ECMULT_GEN_PREC_B ECMULT_GEN_PREC_BITS
 #define ECMULT_GEN_PREC_G (1 << ECMULT_GEN_PREC_B)
-#define ECMULT_GEN_PREC_N (256 / ECMULT_GEN_PREC_B)
+#define ECMULT_GEN_PREC_N (64 / ECMULT_GEN_PREC_B)
 
 typedef struct {
     /* For accelerating the computation of a*G:
