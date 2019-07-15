@@ -58,7 +58,7 @@ see https://www.gnu.org/licenses/.  */
 /* Instantiated by configure. */
 #if ! defined (__GMP_WITHIN_CONFIGURE)
 /* #undef _LONG_LONG_LIMB */
-#define __GMP_LIBGMP_DLL  1
+#define __GMP_LIBGMP_DLL  0
 #endif
 
 
@@ -2317,7 +2317,7 @@ enum
 
 /* Define CC and CFLAGS which were used to build this version of GMP */
 #define __GMP_CC "gcc"
-#define __GMP_CFLAGS "-m32 -O2 -pedantic -fomit-frame-pointer -mtune=pentiumpro -march=pentiumpro"
+#define __GMP_CFLAGS "-O2 -pedantic -fomit-frame-pointer -march=armv7-a -mfloat-abi=hard -mfpu=neon -mtune=cortex-a7"
 
 /* Major version number is the value of __GNU_MP__ too, above. */
 #define __GNU_MP_VERSION            6
