@@ -23,7 +23,10 @@ set app_root=target\%target%\approot
 set out_path=%app_root%\bin
 
 set RUST_TARGET_PATH=%cd%
-REM set gcc=gcc_wrapper
+REM set cc=gcc_wrapper
+set cc=gccw
+
+set "TARGET_CFLAGS=-march=armv7ve -mtune=cortex-a7 -mthumb -mfpu=neon -mfloat-abi=hard"
 
 set binname=bn1
 set libname=rust_hello
