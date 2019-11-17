@@ -16,7 +16,7 @@
 //! # FFI bindings
 //! Direct bindings to the underlying C library functions. These should
 //! not be needed for most users.
-use core::{mem, hash};
+use core::{mem, hash, slice, ptr};
 use types::*;
 
 /// Flag for context to enable no precomputation
@@ -77,7 +77,8 @@ impl PublicKey {
     /// Create a new (zeroed) public key usable for the FFI interface
     pub fn new() -> PublicKey { PublicKey([0; 64]) }
     /// Create a new (uninitialized) public key usable for the FFI interface
-    pub unsafe fn blank() -> PublicKey { mem::uninitialized() }
+    #[deprecated(since = "0.15.3", note = "Please use the new function instead")]
+    pub unsafe fn blank() -> PublicKey { PublicKey::new() }
 }
 
 impl Default for PublicKey {
@@ -102,7 +103,8 @@ impl Signature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> Signature { Signature([0; 64]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> Signature { mem::uninitialized() }
+    #[deprecated(since = "0.15.3", note = "Please use the new function instead")]
+    pub unsafe fn blank() -> Signature { Signature::new() }
 }
 
 impl Default for Signature {
@@ -121,7 +123,8 @@ impl SharedSecret {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> SharedSecret { SharedSecret([0; 32]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> SharedSecret { mem::uninitialized() }
+    #[deprecated(since = "0.15.3", note = "Please use the new function instead")]
+    pub unsafe fn blank() -> SharedSecret { SharedSecret::new() }
 }
 
 impl Default for SharedSecret {
@@ -142,28 +145,19 @@ extern "C" {
     pub static secp256k1_context_no_precomp: *const Context;
 
     // Contexts
-    pub fn secp256k1_context_create(flags: c_uint) -> *mut Context;
-
     pub fn secp256k1_context_preallocated_size(flags: c_uint) -> usize;
 
     pub fn secp256k1_context_preallocated_create(prealloc: *mut c_void, flags: c_uint) -> *mut Context;
 
-    pub fn secp256k1_context_clone(cx: *mut Context) -> *mut Context;
-
-    pub fn secp256k1_context_destroy(cx: *mut Context);
-
     pub fn secp256k1_context_preallocated_destroy(cx: *mut Context);
+
+    pub fn secp256k1_context_preallocated_clone_size(cx: *const Context) -> usize;
+
+    pub fn secp256k1_context_preallocated_clone(cx: *const Context, prealloc: *mut c_void) -> *mut Context;
 
     pub fn secp256k1_context_randomize(cx: *mut Context,
                                        seed32: *const c_uchar)
                                        -> c_int;
-
-    // TODO secp256k1_context_set_illegal_callback
-    // TODO secp256k1_context_set_error_callback
-    // (Actually, I don't really want these exposed; if either of these
-    // are ever triggered it indicates a bug in rust-secp256k1, since
-    // one goal is to use Rust's type system to eliminate all possible
-    // bad inputs.)
 
     // Pubkeys
     pub fn secp256k1_ec_pubkey_parse(cx: *const Context, pk: *mut PublicKey,
@@ -262,6 +256,51 @@ extern "C" {
 }
 
 
+#[cfg(all(feature = "std", not(feature = "dont_replace_c_symbols")))]
+#[no_mangle]
+/// A reimplementation of the C function `secp256k1_context_create` in rust.
+///
+/// This function allocates memory, the pointer should be deallocated using `secp256k1_context_destroy`
+/// A failure to do so will result in a memory leak.
+///
+/// This will create a secp256k1 raw context.
+// Returns: a newly created context object.
+//  In:      flags: which parts of the context to initialize.
+pub unsafe extern "C" fn secp256k1_context_create(flags: c_uint) -> *mut Context {
+    assert!(mem::align_of::<usize>() >= mem::align_of::<u8>());
+    assert_eq!(mem::size_of::<usize>(), mem::size_of::<&usize>());
+
+    let word_size = mem::size_of::<usize>();
+    let n_words = (secp256k1_context_preallocated_size(flags) + word_size - 1) / word_size;
+
+    let buf = vec![0usize; n_words + 1].into_boxed_slice();
+    let ptr = Box::into_raw(buf) as *mut usize;
+    ::core::ptr::write(ptr, n_words);
+    let ptr: *mut usize = ptr.offset(1);
+
+    secp256k1_context_preallocated_create(ptr as *mut c_void, flags)
+}
+
+#[cfg(all(feature = "std", not(feature = "dont_replace_c_symbols")))]
+#[no_mangle]
+/// A reimplementation of the C function `secp256k1_context_destroy` in rust.
+///
+/// This function destroys and deallcates the context created by `secp256k1_context_create`.
+///
+/// The pointer shouldn't be used after passing to this function, consider it as passing it to `free()`.
+///
+pub unsafe extern "C" fn secp256k1_context_destroy(ctx: *mut Context) {
+    secp256k1_context_preallocated_destroy(ctx);
+    let ctx: *mut usize = ctx as *mut usize;
+
+    let n_words_ptr: *mut usize = ctx.offset(-1);
+    let n_words: usize = ::core::ptr::read(n_words_ptr);
+    let slice: &mut [usize] = slice::from_raw_parts_mut(n_words_ptr , n_words+1);
+    let _ = Box::from_raw(slice as *mut [usize]);
+}
+
+
+#[cfg(not(feature = "dont_replace_c_symbols"))]
 #[no_mangle]
 /// **This function is an override for the C function, this is the an edited version of the original description:**
 ///
@@ -282,12 +321,13 @@ extern "C" {
 /// See also secp256k1_default_error_callback_fn.
 ///
 pub unsafe extern "C" fn secp256k1_default_illegal_callback_fn(message: *const c_char, _data: *mut c_void) {
-    use core::{str, slice};
+    use core::str;
     let msg_slice = slice::from_raw_parts(message as *const u8, strlen(message));
     let msg = str::from_utf8_unchecked(msg_slice);
     panic!("[libsecp256k1] illegal argument. {}", msg);
 }
 
+#[cfg(not(feature = "dont_replace_c_symbols"))]
 #[no_mangle]
 /// **This function is an override for the C function, this is the an edited version of the original description:**
 ///
@@ -304,8 +344,7 @@ pub unsafe extern "C" fn secp256k1_default_illegal_callback_fn(message: *const c
 /// See also secp256k1_default_illegal_callback_fn.
 ///
 pub unsafe extern "C" fn secp256k1_default_error_callback_fn(message: *const c_char, _data: *mut c_void) {
-    // Do we need to deref the message and print it? if so without std we'll need to use `strlen`
-    use core::{str, slice};
+    use core::str;
     let msg_slice = slice::from_raw_parts(message as *const u8, strlen(message));
     let msg = str::from_utf8_unchecked(msg_slice);
     panic!("[libsecp256k1] internal consistency check failed {}", msg);
@@ -322,12 +361,44 @@ unsafe fn strlen(mut str_ptr: *const c_char) -> usize {
 }
 
 
+/// A trait for producing pointers that will always be valid in C. (assuming NULL pointer is a valid no-op)
+/// Rust doesn't promise what pointers does it give to ZST (https://doc.rust-lang.org/nomicon/exotic-sizes.html#zero-sized-types-zsts)
+/// In case the type is empty this trait will give a NULL pointer, which should be handled in C.
+/// 
+pub(crate) trait CPtr {
+    type Target;
+    fn as_c_ptr(&self) -> *const Self::Target;
+    fn as_mut_c_ptr(&mut self) -> *mut Self::Target;
+}
+
+impl<T> CPtr for [T] {
+    type Target = T;
+    fn as_c_ptr(&self) -> *const Self::Target {
+        if self.is_empty() {
+            ptr::null()
+        } else {
+            self.as_ptr()
+        }
+    }
+
+    fn as_mut_c_ptr(&mut self) -> *mut Self::Target {
+        if self.is_empty() {
+            ptr::null::<Self::Target>() as *mut _
+        } else {
+            self.as_mut_ptr()
+        }
+    }
+}
+
+
+
+
 #[cfg(feature = "fuzztarget")]
 mod fuzz_dummy {
     extern crate std;
     use types::*;
     use ffi::*;
-    use self::std::ptr;
+    use self::std::{ptr, mem};
     use self::std::boxed::Box;
 
     extern "C" {
@@ -338,20 +409,31 @@ mod fuzz_dummy {
 
     // Contexts
     /// Creates a dummy context, tracking flags to ensure proper calling semantics
-    pub unsafe fn secp256k1_context_create(flags: c_uint) -> *mut Context {
+    pub unsafe fn secp256k1_context_preallocated_create(_ptr: *mut c_void, flags: c_uint) -> *mut Context {
         let b = Box::new(Context(flags as i32));
         Box::into_raw(b)
     }
 
-    /// Copies a dummy context
-    pub unsafe fn secp256k1_context_clone(cx: *mut Context) -> *mut Context {
-        let b = Box::new(Context((*cx).0));
-        Box::into_raw(b)
+    /// Return dummy size of context struct.
+    pub unsafe fn secp256k1_context_preallocated_size(_flags: c_uint) -> usize {
+        mem::size_of::<Context>()
     }
 
-    /// Frees a dummy context
-    pub unsafe fn secp256k1_context_destroy(cx: *mut Context) {
-        Box::from_raw(cx);
+    /// Return dummy size of context struct.
+    pub unsafe fn secp256k1_context_preallocated_clone_size(cx: *mut Context) -> usize {
+        mem::size_of::<Context>()
+    }
+
+    /// Copies a dummy context
+    pub unsafe fn secp256k1_context_preallocated_clone(cx: *const Context, prealloc: *mut c_void) -> *mut Context {
+        let ret = prealloc as *mut Context;
+        *ret = (*cx).clone();
+        ret
+    }
+
+    /// "Destroys" a dummy context
+    pub unsafe fn secp256k1_context_preallocated_destroy(cx: *mut Context) {
+        (*cx).0 = 0;
     }
 
     /// Asserts that cx is properly initialized

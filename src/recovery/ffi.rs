@@ -17,7 +17,7 @@
 
 use core::mem;
 use types::*;
-use ffi::{Context, NonceFn, PublicKey, Signature};
+use ffi::{Context, NonceFn, PublicKey, Signature, CPtr};
 
 /// Library-internal representation of a Secp256k1 signature + recovery ID
 #[repr(C)]
@@ -29,7 +29,8 @@ impl RecoverableSignature {
     /// Create a new (zeroed) signature usable for the FFI interface
     pub fn new() -> RecoverableSignature { RecoverableSignature([0; 65]) }
     /// Create a new (uninitialized) signature usable for the FFI interface
-    pub unsafe fn blank() -> RecoverableSignature { mem::uninitialized() }
+    #[deprecated(since = "0.15.3", note = "Please use the new function instead")]
+    pub unsafe fn blank() -> RecoverableSignature { RecoverableSignature::new() }
 }
 
 impl Default for RecoverableSignature {

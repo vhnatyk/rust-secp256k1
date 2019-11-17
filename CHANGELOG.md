@@ -1,3 +1,39 @@
+
+# 0.15.4 - 2019-09-06
+
+- Add `rand-std` feature.
+- Pin the cc build-dep version to `< 1.0.42` to remain
+  compatible with rustc 1.22.0.
+- Changed all `as_*ptr()` to a new safer `CPtr` trait
+
+# 0.15.2 - 2019-08-08
+
+- Add feature `lowmemory` that reduces the EC mult window size to require
+  significantly less memory for the validation context (~680B instead of
+  ~520kB), at the cost of slower validation. It does not affect the speed of
+  signing, nor the size of the signing context.
+
+# 0.15.0 - 2019-07-25
+
+* Implement hex human-readable serde for PublicKey
+* Implement fmt::LowerHex for SecretKey and PublicKey
+* Relax `cc` dependency requirements
+* Add links manifest key to prevent cross-version linkage
+
+# 0.14.1 - 2019-07-14
+
+* Implemented FFI functions: `secp256k1_context_create` and `secp256k1_context_destroy` in rust.
+
+# 0.14.0 - 2019-07-08
+
+* [Feature-gate endormorphism optimization](https://github.com/rust-bitcoin/rust-secp256k1/pull/120)
+  because of a lack of clarity with respect to patents
+* Got full no-std support including eliminating all use of libc in C bindings.
+  [PR 1](https://github.com/rust-bitcoin/rust-secp256k1/pull/115)
+  [PR 2](https://github.com/rust-bitcoin/rust-secp256k1/pull/125).
+  This library should be usable in bare-metal environments and with rust-wasm.
+  Thanks to Elichai Turkel for driving this forward!
+
 # 0.13.0 - 2019-05-21
 
 * Update minimum supported rust compiler 1.22.
@@ -6,7 +42,7 @@
 * Add human readable serialization to `Signatures` and `SecretKeys`.
 * Stop displaying 0 bytes if a `Signature` is less than 72 bytes.
 * Only compile recovery module if feature `recovery` is set (non-default).
-* Updat `rand` dependency from 0.4 to 0.6 and add `rand_core` 0.4 dependency.
+* Update `rand` dependency from 0.4 to 0.6 and add `rand_core` 0.4 dependency.
 * Relax `cc` dependency requirements.
 
 # 0.12.2 - 2019-01-18

@@ -68,15 +68,8 @@ macro_rules! impl_array_newtype {
         impl Clone for $thing {
             #[inline]
             fn clone(&self) -> $thing {
-                unsafe {
-                    use core::intrinsics::copy_nonoverlapping;
-                    use core::mem;
-                    let mut ret: $thing = mem::uninitialized();
-                    copy_nonoverlapping(self.as_ptr(),
-                                        ret.as_mut_ptr(),
-                                        $len);
-                    ret
-                }
+                let &$thing(ref dat) = self;
+                $thing(dat.clone())
             }
         }
 
@@ -127,6 +120,24 @@ macro_rules! impl_array_newtype {
             fn index(&self, _: ::core::ops::RangeFull) -> &[$ty] {
                 let &$thing(ref dat) = self;
                 &dat[..]
+            }
+        }
+        impl ::ffi::CPtr for $thing {
+            type Target = $ty;
+            fn as_c_ptr(&self) -> *const Self::Target {
+                if self.is_empty() {
+                    ::core::ptr::null()
+                } else {
+                    self.as_ptr()
+                }
+            }
+
+            fn as_mut_c_ptr(&mut self) -> *mut Self::Target {
+                if self.is_empty() {
+                    ::core::ptr::null::<Self::Target>() as *mut _
+                } else {
+                    self.as_mut_ptr()
+                }
             }
         }
     }

@@ -19,7 +19,7 @@
 use core::{ops, ptr};
 
 use key::{SecretKey, PublicKey};
-use ffi;
+use ffi::{self, CPtr};
 
 /// A tag used for recovering the public key from a compact signature
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -30,12 +30,12 @@ impl SharedSecret {
     #[inline]
     pub fn new(point: &PublicKey, scalar: &SecretKey) -> SharedSecret {
         unsafe {
-            let mut ss = ffi::SharedSecret::blank();
+            let mut ss = ffi::SharedSecret::new();
             let res = ffi::secp256k1_ecdh(
                 ffi::secp256k1_context_no_precomp,
                 &mut ss,
-                point.as_ptr(),
-                scalar.as_ptr(),
+                point.as_c_ptr(),
+                scalar.as_c_ptr(),
                 ffi::secp256k1_ecdh_hash_function_default,
                 ptr::null_mut(),
             );

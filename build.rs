@@ -45,7 +45,6 @@ fn main() {
     base_config.include("depend/secp256k1/")
                .include("depend/secp256k1/include")
                .include("depend/secp256k1/src")
-               .debug(true)
                .flag_if_supported("-Wno-unused-function") // some ecmult stuff is defined but not used upstream
                .define("SECP256K1_BUILD", Some("1"))
                // TODO these three should be changed to use libgmp, at least until secp PR 290 is merged
@@ -59,6 +58,13 @@ fn main() {
                .define("USE_EXTERNAL_DEFAULT_CALLBACKS", Some("1"))
                .define("ECMULT_WINDOW_SIZE", Some("4")); // This is the default in the configure file (`auto`)
 
+    if cfg!(feature = "lowmemory") {
+        base_config.define("ECMULT_WINDOW_SIZE", Some("4")); // A low-enough value to consume neglible memory
+    } else {
+        base_config.define("ECMULT_WINDOW_SIZE", Some("15")); // This is the default in the configure file (`auto`)
+    }
+    #[cfg(not(feature = "dont_replace_c_symbols"))]
+    base_config.define("USE_EXTERNAL_DEFAULT_CALLBACKS", Some("1"));
     #[cfg(feature = "endomorphism")]
     base_config.define("USE_ENDOMORPHISM", Some("1"));
     #[cfg(feature = "recovery")]
